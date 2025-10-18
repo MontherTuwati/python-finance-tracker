@@ -103,6 +103,8 @@ def generate_chart(period="monthly"):
         # For daily views
         dates = [datetime.datetime.strptime(row[0], "%Y-%m-%d").date() for row in data]
         totals = [row[1] for row in data]
+        if len(dates) == 0:
+            return None
         ax.plot(dates, totals, marker='o', linestyle='-', color="#00d4aa", linewidth=3, markersize=6, markerfacecolor="#00d4aa", markeredgecolor="#ffffff", markeredgewidth=1)
         ax.set_xlabel("Date", color="#cccccc", fontsize=11)
         ax.tick_params(axis='x', rotation=45, colors="#cccccc")
@@ -309,6 +311,167 @@ def open_add_transaction():
     submit_btn.bind("<Enter>", on_enter)
     submit_btn.bind("<Leave>", on_leave)
 
+# Settings window
+def open_settings():
+    def save_and_close():
+        global MONTHLY_BUDGET, DAILY_LIMIT, SAVINGS_GOAL
+        
+        try:
+            new_budget = float(budget_entry.get())
+            new_daily = float(daily_entry.get())
+            new_savings = float(savings_entry.get())
+            
+            if new_budget <= 0 or new_daily <= 0 or new_savings < 0:
+                messagebox.showerror("Invalid Input", "All values must be positive numbers")
+                return
+            
+            MONTHLY_BUDGET = new_budget
+            DAILY_LIMIT = new_daily
+            SAVINGS_GOAL = new_savings
+            
+            save_settings()
+            refresh_profile_overview()
+            settings_window.destroy()
+            
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please enter valid numbers for all fields")
+
+    settings_window = tk.Toplevel(root)
+    settings_window.title("Settings")
+    settings_window.geometry("400x600")
+    settings_window.config(bg="#1e1e1e")
+    settings_window.resizable(False, False)
+    
+    # Center the window
+    settings_window.transient(root)
+    settings_window.grab_set()
+    
+    # Header
+    header_frame = tk.Frame(settings_window, bg="#2d2d2d", height=60)
+    header_frame.pack(fill="x", padx=0, pady=0)
+    header_frame.pack_propagate(False)
+    
+    tk.Label(header_frame, text="⚙️ Financial Settings", 
+             font=("Segoe UI", 16, "bold"), 
+             bg="#2d2d2d", fg="#ffffff").pack(expand=True)
+    
+    # Create scrollable frame
+    canvas = tk.Canvas(settings_window, bg="#1e1e1e", highlightthickness=0)
+    scrollbar = ttk.Scrollbar(settings_window, orient="vertical", command=canvas.yview)
+    scrollable_frame = tk.Frame(canvas, bg="#1e1e1e")
+    
+    # Configure scrolling
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+    
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    # Make scrollable frame fill the full width
+    def configure_scrollable_frame(event):
+        canvas_width = event.width
+        canvas.itemconfig(canvas.find_all()[0], width=canvas_width)
+    
+    canvas.bind('<Configure>', configure_scrollable_frame)
+    
+    # Pack canvas and scrollbar
+    canvas.pack(side="left", fill="both", expand=True, padx=30, pady=20)
+    scrollbar.pack(side="right", fill="y")
+    
+    # Mouse wheel binding for settings
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    
+    def _unbind_mousewheel(event):
+        canvas.unbind_all("<MouseWheel>")
+    
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+    settings_window.bind("<Destroy>", _unbind_mousewheel)
+    
+    # Main content
+    content_frame = scrollable_frame
+    
+    # Monthly Budget
+    tk.Label(content_frame, text="💰 Monthly Budget ($):", 
+             font=("Segoe UI", 11, "bold"), 
+             bg="#1e1e1e", fg="#cccccc", anchor="w").pack(anchor="w", pady=(10, 5))
+    
+    budget_entry = tk.Entry(content_frame, font=("Segoe UI", 11), bg="#2d2d2d", fg="#ffffff", 
+                           insertbackground="#ffffff", relief="flat", bd=0)
+    budget_entry.insert(0, str(MONTHLY_BUDGET))
+    budget_entry.pack(fill="x", pady=(0, 15), ipady=8, ipadx=10)
+    
+    # Daily Limit
+    tk.Label(content_frame, text="📊 Daily Spending Limit ($):", 
+             font=("Segoe UI", 11, "bold"), 
+             bg="#1e1e1e", fg="#cccccc", anchor="w").pack(anchor="w", pady=(10, 5))
+    
+    daily_entry = tk.Entry(content_frame, font=("Segoe UI", 11), bg="#2d2d2d", fg="#ffffff", 
+                          insertbackground="#ffffff", relief="flat", bd=0)
+    daily_entry.insert(0, str(DAILY_LIMIT))
+    daily_entry.pack(fill="x", pady=(0, 15), ipady=8, ipadx=10)
+    
+    # Savings Goal
+    tk.Label(content_frame, text="🎯 Monthly Savings Goal ($):", 
+             font=("Segoe UI", 11, "bold"), 
+             bg="#1e1e1e", fg="#cccccc", anchor="w").pack(anchor="w", pady=(10, 5))
+    
+    savings_entry = tk.Entry(content_frame, font=("Segoe UI", 11), bg="#2d2d2d", fg="#ffffff", 
+                            insertbackground="#ffffff", relief="flat", bd=0)
+    savings_entry.insert(0, str(SAVINGS_GOAL))
+    savings_entry.pack(fill="x", pady=(0, 15), ipady=8, ipadx=10)
+    
+    # Info text
+    info_text = """💡 Tips:
+• Monthly Budget: Your total spending limit for the month
+• Daily Limit: Recommended daily spending amount
+• Savings Goal: How much you want to save each month"""
+    
+    tk.Label(content_frame, text=info_text, 
+             font=("Segoe UI", 9), 
+             bg="#1e1e1e", fg="#888888", 
+             justify="left", anchor="w").pack(anchor="w", pady=(20, 20))
+    
+    # Buttons
+    button_frame = tk.Frame(content_frame, bg="#1e1e1e")
+    button_frame.pack(fill="x", pady=(10, 0))
+    
+    cancel_btn = tk.Button(button_frame, text="❌ Cancel", 
+                          command=settings_window.destroy,
+                          font=("Segoe UI", 11, "bold"),
+                          bg="#666666", fg="#ffffff", 
+                          relief="flat", bd=0,
+                          padx=20, pady=10,
+                          cursor="hand2")
+    cancel_btn.pack(side="left")
+    
+    save_btn = tk.Button(button_frame, text="💾 Save Settings", 
+                        command=save_and_close,
+                        font=("Segoe UI", 11, "bold"),
+                        bg="#00d4aa", fg="#ffffff", 
+                        relief="flat", bd=0,
+                        padx=20, pady=10,
+                        cursor="hand2")
+    save_btn.pack(side="right")
+    
+    # Hover effects
+    def on_enter_save(e):
+        save_btn.config(bg="#00b894")
+    def on_leave_save(e):
+        save_btn.config(bg="#00d4aa")
+    
+    def on_enter_cancel(e):
+        cancel_btn.config(bg="#777777")
+    def on_leave_cancel(e):
+        cancel_btn.config(bg="#666666")
+    
+    save_btn.bind("<Enter>", on_enter_save)
+    save_btn.bind("<Leave>", on_leave_save)
+    cancel_btn.bind("<Enter>", on_enter_cancel)
+    cancel_btn.bind("<Leave>", on_leave_cancel)
+
 # Main window with modern styling
 root = tk.Tk()
 root.title("💰 Finance Tracker - Modern Dashboard")
@@ -387,6 +550,16 @@ tk.Label(header_frame, text="💰 Finance Dashboard",
          font=("Segoe UI", 24, "bold"), 
          bg="#2d2d2d", fg="#ffffff").pack(side="left")
 
+# Settings button
+settings_btn = tk.Button(header_frame, text="⚙️ Settings", 
+                        command=open_settings,
+                        bg="#4d4d4d", fg="#ffffff", 
+                        font=("Segoe UI", 10, "bold"),
+                        relief="flat", bd=0,
+                        padx=15, pady=8,
+                        cursor="hand2")
+settings_btn.pack(side="right", padx=(0, 20))
+
 # Welcome message
 import calendar
 today = datetime.date.today()
@@ -444,10 +617,35 @@ def get_projected_monthly():
     days_in_month = calendar.monthrange(today.year, today.month)[1]
     return daily_avg * days_in_month
 
-# User financial goals and limits (you can customize these)
+# User financial goals and limits (default values)
 MONTHLY_BUDGET = 2000.0
 DAILY_LIMIT = 100.0
 SAVINGS_GOAL = 500.0
+
+# Settings file to store user preferences
+SETTINGS_FILE = "settings.txt"
+
+def load_settings():
+    global MONTHLY_BUDGET, DAILY_LIMIT, SAVINGS_GOAL
+    try:
+        with open(SETTINGS_FILE, 'r') as f:
+            lines = f.readlines()
+            if len(lines) >= 3:
+                MONTHLY_BUDGET = float(lines[0].strip())
+                DAILY_LIMIT = float(lines[1].strip())
+                SAVINGS_GOAL = float(lines[2].strip())
+    except (FileNotFoundError, ValueError):
+        # Use default values if file doesn't exist or has invalid data
+        pass
+
+def save_settings():
+    with open(SETTINGS_FILE, 'w') as f:
+        f.write(f"{MONTHLY_BUDGET}\n")
+        f.write(f"{DAILY_LIMIT}\n")
+        f.write(f"{SAVINGS_GOAL}\n")
+
+# Load settings on startup
+load_settings()
 
 # Current spending
 current_spending = get_monthly_spending()
@@ -916,6 +1114,14 @@ def add_hover_effects():
     
     search_btn.bind("<Enter>", on_enter_search)
     search_btn.bind("<Leave>", on_leave_search)
+    
+    def on_enter_settings(e):
+        settings_btn.config(bg="#5d5d5d")
+    def on_leave_settings(e):
+        settings_btn.config(bg="#4d4d4d")
+    
+    settings_btn.bind("<Enter>", on_enter_settings)
+    settings_btn.bind("<Leave>", on_leave_settings)
 
 # Initialize the application
 refresh_table()
