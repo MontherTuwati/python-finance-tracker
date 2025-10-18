@@ -90,7 +90,7 @@ def generate_chart(period="monthly"):
 
     # Modern chart styling
     plt.style.use('dark_background')
-    fig, ax = plt.subplots(figsize=(5, 3), facecolor='#1e1e1e')
+    fig, ax = plt.subplots(figsize=(8, 5), facecolor='#1e1e1e')
     ax.set_facecolor('#2d2d2d')
     
     if period == "yearly":
@@ -375,7 +375,7 @@ style.map("Modern.Treeview",
 # ────────────────────────
 # 🎨 Modern Top Section
 # ────────────────────────
-top_frame = tk.Frame(scrollable_frame, bg="#2d2d2d", height=320)
+top_frame = tk.Frame(scrollable_frame, bg="#2d2d2d", height=600)
 top_frame.pack(fill="x", padx=20, pady=(20, 0))
 top_frame.pack_propagate(False)
 
@@ -403,7 +403,7 @@ content_top = tk.Frame(top_frame, bg="#2d2d2d")
 content_top.pack(fill="both", expand=True, padx=20, pady=20)
 
 # Profile card (left)
-profile_frame = tk.Frame(content_top, bg="#3d3d3d", width=350, height=200, relief="flat", bd=0)
+profile_frame = tk.Frame(content_top, bg="#3d3d3d", width=350, height=450, relief="flat", bd=0)
 profile_frame.pack(side="left", padx=(0, 20))
 profile_frame.pack_propagate(False)
 
