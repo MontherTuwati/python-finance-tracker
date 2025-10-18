@@ -39,31 +39,76 @@ def get_category_total(cat):
     conn.close()
     return result if result else 0.0
 
-def generate_chart():
+def generate_chart(period="monthly"):
     conn = sqlite3.connect("finance_tracker.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT date, SUM(amount) FROM transactions GROUP BY date ORDER BY date")
+    
+    # Get current date for filtering
+    today = datetime.date.today()
+    
+    if period == "weekly":
+        # Get last 7 days
+        start_date = today - datetime.timedelta(days=7)
+        cursor.execute("""
+            SELECT date, SUM(amount) 
+            FROM transactions 
+            WHERE date >= ? AND date <= ?
+            GROUP BY date 
+            ORDER BY date
+        """, (start_date.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")))
+        title = "Weekly Expenses (Last 7 Days)"
+        
+    elif period == "monthly":
+        # Get current month
+        start_date = today.replace(day=1)
+        cursor.execute("""
+            SELECT date, SUM(amount) 
+            FROM transactions 
+            WHERE date >= ? AND date <= ?
+            GROUP BY date 
+            ORDER BY date
+        """, (start_date.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")))
+        title = f"Monthly Expenses ({today.strftime('%B %Y')})"
+        
+    elif period == "yearly":
+        # Get current year
+        start_date = today.replace(month=1, day=1)
+        cursor.execute("""
+            SELECT strftime('%Y-%m', date) as month, SUM(amount) 
+            FROM transactions 
+            WHERE date >= ? AND date <= ?
+            GROUP BY strftime('%Y-%m', date) 
+            ORDER BY month
+        """, (start_date.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")))
+        title = f"Yearly Expenses ({today.year})"
+    
     data = cursor.fetchall()
     conn.close()
 
     if not data:
         return None
 
-    dates = [datetime.datetime.strptime(row[0], "%Y-%m-%d").date() for row in data]
-    totals = [row[1] for row in data]
-
     # Modern chart styling
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(5, 3), facecolor='#1e1e1e')
     ax.set_facecolor('#2d2d2d')
     
-    # Modern gradient line
-    ax.plot(dates, totals, marker='o', linestyle='-', color="#00d4aa", linewidth=3, markersize=6, markerfacecolor="#00d4aa", markeredgecolor="#ffffff", markeredgewidth=1)
+    if period == "yearly":
+        # For yearly view, use month labels
+        months = [datetime.datetime.strptime(row[0], "%Y-%m").strftime("%b") for row in data]
+        totals = [row[1] for row in data]
+        ax.plot(months, totals, marker='o', linestyle='-', color="#00d4aa", linewidth=3, markersize=6, markerfacecolor="#00d4aa", markeredgecolor="#ffffff", markeredgewidth=1)
+        ax.set_xlabel("Month", color="#cccccc", fontsize=11)
+    else:
+        # For daily views
+        dates = [datetime.datetime.strptime(row[0], "%Y-%m-%d").date() for row in data]
+        totals = [row[1] for row in data]
+        ax.plot(dates, totals, marker='o', linestyle='-', color="#00d4aa", linewidth=3, markersize=6, markerfacecolor="#00d4aa", markeredgecolor="#ffffff", markeredgewidth=1)
+        ax.set_xlabel("Date", color="#cccccc", fontsize=11)
+        ax.tick_params(axis='x', rotation=45, colors="#cccccc")
     
-    ax.set_title("Expenses Over Time", color="#ffffff", fontsize=14, fontweight="bold", pad=20)
-    ax.set_xlabel("Date", color="#cccccc", fontsize=11)
+    ax.set_title(title, color="#ffffff", fontsize=14, fontweight="bold", pad=20)
     ax.set_ylabel("Total Spent ($)", color="#cccccc", fontsize=11)
-    ax.tick_params(axis='x', rotation=45, colors="#cccccc")
     ax.tick_params(axis='y', colors="#cccccc")
     
     # Grid styling
@@ -359,20 +404,58 @@ tk.Label(stats_frame, text=f"📊 {weekdays} weekdays • 🏖️ {weekends} wee
 chart_frame = tk.Frame(content_top, bg="#3d3d3d", relief="flat", bd=0)
 chart_frame.pack(side="right", fill="both", expand=True)
 
-# Chart header
+# Chart header with period selection
 chart_header = tk.Frame(chart_frame, bg="#4d4d4d", height=50)
 chart_header.pack(fill="x")
 chart_header.pack_propagate(False)
 
 tk.Label(chart_header, text="📈 Spending Trends", 
          font=("Segoe UI", 14, "bold"), 
-         bg="#4d4d4d", fg="#ffffff").pack(expand=True)
+         bg="#4d4d4d", fg="#ffffff").pack(side="left", padx=15, expand=True)
+
+# Period selection buttons
+period_frame = tk.Frame(chart_header, bg="#4d4d4d")
+period_frame.pack(side="right", padx=15)
+
+current_period = tk.StringVar(value="monthly")
+
+def update_chart():
+    global chart_canvas
+    # Clear existing chart
+    for widget in chart_content.winfo_children():
+        widget.destroy()
+    
+    # Generate new chart
+    fig = generate_chart(current_period.get())
+    if fig:
+        chart_canvas = FigureCanvasTkAgg(fig, master=chart_content)
+        chart_canvas.draw()
+        chart_canvas.get_tk_widget().pack(fill="both", expand=True)
+    else:
+        tk.Label(chart_content, text="📊 No data available\nAdd some transactions to see trends!", 
+                 font=("Segoe UI", 12), 
+                 bg="#3d3d3d", fg="#888888", 
+                 justify="center").pack(expand=True)
+
+# Period buttons
+periods = [("Weekly", "weekly"), ("Monthly", "monthly"), ("Yearly", "yearly")]
+for text, value in periods:
+    btn = tk.Radiobutton(period_frame, text=text, variable=current_period, value=value,
+                        command=update_chart,
+                        font=("Segoe UI", 9, "bold"),
+                        bg="#4d4d4d", fg="#ffffff", 
+                        selectcolor="#00d4aa",
+                        activebackground="#4d4d4d",
+                        activeforeground="#ffffff",
+                        relief="flat", bd=0)
+    btn.pack(side="left", padx=2)
 
 # Chart content
 chart_content = tk.Frame(chart_frame, bg="#3d3d3d")
 chart_content.pack(fill="both", expand=True, padx=10, pady=10)
 
-fig = generate_chart()
+# Initialize chart with monthly view
+fig = generate_chart("monthly")
 if fig:
     chart_canvas = FigureCanvasTkAgg(fig, master=chart_content)
     chart_canvas.draw()
@@ -584,6 +667,8 @@ def refresh_table():
         display_row = row[1:]  # Skip ID column
         tree.insert("", "end", values=display_row)
     refresh_category_cards()
+    # Update chart with current period
+    update_chart()
     # Update scroll region after content changes
     root.after(50, configure_scroll_region)
 
