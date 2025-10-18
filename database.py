@@ -14,5 +14,17 @@ def init_db():
             payment_type TEXT DEFAULT 'Cash'
         )
     ''')
+    
+    # Add new columns if they don't exist (for existing databases)
+    try:
+        cursor.execute("ALTER TABLE transactions ADD COLUMN upcoming INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    try:
+        cursor.execute("ALTER TABLE transactions ADD COLUMN payment_type TEXT DEFAULT 'Cash'")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
     conn.commit()
     conn.close()

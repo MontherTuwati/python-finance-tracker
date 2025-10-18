@@ -136,15 +136,37 @@ category_data = {
 # Modern add transaction form
 def open_add_transaction():
     def submit():
-        date = date_entry.get()
+        date = date_entry.get().strip()
         category = category_var.get()
         amount_raw = amount_entry.get().strip()
-        notes = notes_entry.get()
+        notes = notes_entry.get().strip()
         upcoming = 1 if upcoming_var.get() else 0
         payment_type = payment_type_var.get()
 
+        # Validation
+        if not date:
+            messagebox.showerror("Invalid Input", "Please enter a date")
+            return
+        if not category:
+            messagebox.showerror("Invalid Input", "Please select a category")
+            return
+        if not amount_raw:
+            messagebox.showerror("Invalid Input", "Please enter an amount")
+            return
+
         try:
             amount = float(amount_raw)
+            if amount <= 0:
+                messagebox.showerror("Invalid Input", "Amount must be greater than 0")
+                return
+            
+            # Validate date format
+            try:
+                datetime.datetime.strptime(date, "%Y-%m-%d")
+            except ValueError:
+                messagebox.showerror("Invalid Input", "Date must be in YYYY-MM-DD format")
+                return
+            
             insert_transaction(date, category, amount, notes, upcoming, payment_type)
             form.destroy()
         except ValueError:
@@ -152,7 +174,7 @@ def open_add_transaction():
 
     form = tk.Toplevel(root)
     form.title("Add Transaction")
-    form.geometry("420x500")
+    form.geometry("420x600")
     form.config(bg="#1e1e1e")
     form.resizable(False, False)
     
@@ -169,67 +191,104 @@ def open_add_transaction():
              font=("Segoe UI", 16, "bold"), 
              bg="#2d2d2d", fg="#ffffff").pack(expand=True)
     
-    # Main content
-    content_frame = tk.Frame(form, bg="#1e1e1e")
-    content_frame.pack(fill="both", expand=True, padx=30, pady=20)
+    # Create scrollable frame
+    canvas = tk.Canvas(form, bg="#1e1e1e", highlightthickness=0)
+    scrollbar = ttk.Scrollbar(form, orient="vertical", command=canvas.yview)
+    scrollable_frame = tk.Frame(canvas, bg="#1e1e1e")
     
-    # Form fields with modern styling
-    def create_field(label_text, widget, row):
-        label = tk.Label(content_frame, text=label_text, 
-                        font=("Segoe UI", 11, "bold"), 
-                        bg="#1e1e1e", fg="#cccccc", anchor="w")
-        label.grid(row=row, column=0, sticky="w", pady=(15, 5))
-        
-        if isinstance(widget, tk.Entry):
-            widget.config(font=("Segoe UI", 11), bg="#2d2d2d", fg="#ffffff", 
-                         insertbackground="#ffffff", relief="flat", bd=0)
-        elif isinstance(widget, ttk.Combobox):
-            style = ttk.Style()
-            style.configure("Modern.TCombobox", fieldbackground="#2d2d2d", 
-                           background="#2d2d2d", foreground="#ffffff", 
-                           borderwidth=0, relief="flat")
-            widget.config(style="Modern.TCombobox", font=("Segoe UI", 11))
-        
-        widget.grid(row=row+1, column=0, sticky="ew", pady=(0, 10), ipady=8, ipadx=10)
-        content_frame.grid_columnconfigure(0, weight=1)
-
+    # Configure scrolling
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+    
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    # Make scrollable frame fill the full width
+    def configure_scrollable_frame(event):
+        canvas_width = event.width
+        canvas.itemconfig(canvas.find_all()[0], width=canvas_width)
+    
+    canvas.bind('<Configure>', configure_scrollable_frame)
+    
+    # Pack canvas and scrollbar
+    canvas.pack(side="left", fill="both", expand=True, padx=30, pady=20)
+    scrollbar.pack(side="right", fill="y")
+    
+    # Mouse wheel binding for form
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    
+    def _unbind_mousewheel(event):
+        canvas.unbind_all("<MouseWheel>")
+    
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+    form.bind("<Destroy>", _unbind_mousewheel)
+    
+    # Main content
+    content_frame = scrollable_frame
+    
     # Date field
-    date_entry = tk.Entry(content_frame, width=30)
-    create_field("📅 Date (YYYY-MM-DD):", date_entry, 0)
+    tk.Label(content_frame, text="📅 Date (YYYY-MM-DD):", 
+             font=("Segoe UI", 11, "bold"), 
+             bg="#1e1e1e", fg="#cccccc", anchor="w").pack(anchor="w", pady=(10, 5))
+    
+    date_entry = tk.Entry(content_frame, font=("Segoe UI", 11), bg="#2d2d2d", fg="#ffffff", 
+                         insertbackground="#ffffff", relief="flat", bd=0)
+    date_entry.insert(0, datetime.date.today().strftime("%Y-%m-%d"))
+    date_entry.pack(fill="x", pady=(0, 15), ipady=8, ipadx=10)
     
     # Category field
+    tk.Label(content_frame, text="🏷️ Category:", 
+             font=("Segoe UI", 11, "bold"), 
+             bg="#1e1e1e", fg="#cccccc", anchor="w").pack(anchor="w", pady=(10, 5))
+    
     category_var = tk.StringVar()
     category_menu = ttk.Combobox(content_frame, textvariable=category_var, 
-                                values=list(category_data.keys()), state="readonly")
-    create_field("🏷️ Category:", category_menu, 2)
+                                values=list(category_data.keys()), state="readonly",
+                                font=("Segoe UI", 11))
+    category_menu.pack(fill="x", pady=(0, 15), ipady=8, ipadx=10)
     
     # Amount field
-    amount_entry = tk.Entry(content_frame, width=30)
-    create_field("💰 Amount ($):", amount_entry, 4)
+    tk.Label(content_frame, text="💰 Amount ($):", 
+             font=("Segoe UI", 11, "bold"), 
+             bg="#1e1e1e", fg="#cccccc", anchor="w").pack(anchor="w", pady=(10, 5))
+    
+    amount_entry = tk.Entry(content_frame, font=("Segoe UI", 11), bg="#2d2d2d", fg="#ffffff", 
+                           insertbackground="#ffffff", relief="flat", bd=0)
+    amount_entry.pack(fill="x", pady=(0, 15), ipady=8, ipadx=10)
     
     # Notes field
-    notes_entry = tk.Entry(content_frame, width=30)
-    create_field("📝 Notes:", notes_entry, 6)
+    tk.Label(content_frame, text="📝 Notes:", 
+             font=("Segoe UI", 11, "bold"), 
+             bg="#1e1e1e", fg="#cccccc", anchor="w").pack(anchor="w", pady=(10, 5))
+    
+    notes_entry = tk.Entry(content_frame, font=("Segoe UI", 11), bg="#2d2d2d", fg="#ffffff", 
+                          insertbackground="#ffffff", relief="flat", bd=0)
+    notes_entry.pack(fill="x", pady=(0, 15), ipady=8, ipadx=10)
     
     # Payment type field
+    tk.Label(content_frame, text="💳 Payment Type:", 
+             font=("Segoe UI", 11, "bold"), 
+             bg="#1e1e1e", fg="#cccccc", anchor="w").pack(anchor="w", pady=(10, 5))
+    
     payment_type_var = tk.StringVar(value="Cash")
     payment_menu = ttk.Combobox(content_frame, textvariable=payment_type_var, 
-                               values=["Cash", "Card"], state="readonly")
-    create_field("💳 Payment Type:", payment_menu, 8)
+                               values=["Cash", "Card"], state="readonly",
+                               font=("Segoe UI", 11))
+    payment_menu.pack(fill="x", pady=(0, 15), ipady=8, ipadx=10)
     
     # Upcoming checkbox
     upcoming_var = tk.IntVar()
-    checkbox_frame = tk.Frame(content_frame, bg="#1e1e1e")
-    checkbox_frame.grid(row=10, column=0, sticky="w", pady=(15, 20))
-    
-    checkbox = tk.Checkbutton(checkbox_frame, text="🔮 Mark as Upcoming Transaction", 
+    checkbox = tk.Checkbutton(content_frame, text="🔮 Mark as Upcoming Transaction", 
                              variable=upcoming_var, 
                              font=("Segoe UI", 11), 
                              bg="#1e1e1e", fg="#cccccc", 
                              selectcolor="#2d2d2d", 
                              activebackground="#1e1e1e", 
                              activeforeground="#ffffff")
-    checkbox.pack(side="left")
+    checkbox.pack(anchor="w", pady=(10, 20))
     
     # Submit button
     submit_btn = tk.Button(content_frame, text="✨ Add Transaction", 
@@ -239,7 +298,7 @@ def open_add_transaction():
                           relief="flat", bd=0,
                           padx=30, pady=12,
                           cursor="hand2")
-    submit_btn.grid(row=11, column=0, pady=(20, 0))
+    submit_btn.pack(pady=(10, 0))
     
     # Hover effects
     def on_enter(e):
