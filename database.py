@@ -9,7 +9,9 @@ def init_db():
             date TEXT NOT NULL,
             category TEXT NOT NULL,
             amount REAL NOT NULL,
-            notes TEXT
+            notes TEXT,
+            upcoming INTEGER DEFAULT 0,
+            payment_type TEXT DEFAULT 'Cash'
         )
     ''')
     conn.commit()
