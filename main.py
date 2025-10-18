@@ -420,43 +420,118 @@ tk.Label(profile_header, text="👤 Profile Overview",
 profile_content = tk.Frame(profile_frame, bg="#3d3d3d")
 profile_content.pack(fill="both", expand=True, padx=20, pady=15)
 
-# Month progress
+# Financial Overview Functions
+def get_monthly_spending():
+    conn = sqlite3.connect("finance_tracker.db")
+    cursor = conn.cursor()
+    start_date = today.replace(day=1)
+    cursor.execute("""
+        SELECT SUM(amount) 
+        FROM transactions 
+        WHERE date >= ? AND date <= ?
+    """, (start_date.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")))
+    result = cursor.fetchone()[0]
+    conn.close()
+    return result if result else 0.0
+
+def get_daily_average():
+    monthly_spent = get_monthly_spending()
+    days_passed = today.day
+    return monthly_spent / days_passed if days_passed > 0 else 0
+
+def get_projected_monthly():
+    daily_avg = get_daily_average()
+    days_in_month = calendar.monthrange(today.year, today.month)[1]
+    return daily_avg * days_in_month
+
+# User financial goals and limits (you can customize these)
+MONTHLY_BUDGET = 2000.0
+DAILY_LIMIT = 100.0
+SAVINGS_GOAL = 500.0
+
+# Current spending
+current_spending = get_monthly_spending()
+daily_avg = get_daily_average()
+projected_spending = get_projected_monthly()
+
+# Budget progress
+budget_percent = min((current_spending / MONTHLY_BUDGET) * 100, 100)
+budget_remaining = max(MONTHLY_BUDGET - current_spending, 0)
+
+# Financial Overview Section
+tk.Label(profile_content, text="💰 Financial Overview", 
+         font=("Segoe UI", 12, "bold"), 
+         bg="#3d3d3d", fg="#ffffff", anchor="w").pack(anchor="w", pady=(0, 10))
+
+# Monthly Budget Progress
+budget_frame = tk.Frame(profile_content, bg="#3d3d3d")
+budget_frame.pack(fill="x", pady=(0, 10))
+
+tk.Label(budget_frame, text=f"Monthly Budget: ${MONTHLY_BUDGET:,.0f}", 
+         font=("Segoe UI", 10, "bold"), 
+         bg="#3d3d3d", fg="#ffffff").pack(anchor="w")
+
+tk.Label(budget_frame, text=f"Spent: ${current_spending:,.2f} • Remaining: ${budget_remaining:,.2f}", 
+         font=("Segoe UI", 9), 
+         bg="#3d3d3d", fg="#cccccc").pack(anchor="w")
+
+# Budget progress bar
+budget_progress_frame = tk.Frame(budget_frame, bg="#2d2d2d", height=6, relief="flat")
+budget_progress_frame.pack(fill="x", pady=(5, 0))
+budget_progress_frame.pack_propagate(False)
+
+budget_progress_fill = tk.Frame(budget_progress_frame, 
+                               bg="#ff6b6b" if budget_percent > 80 else "#f9ca24" if budget_percent > 60 else "#00d4aa", 
+                               width=int(budget_progress_frame.winfo_reqwidth() * budget_percent / 100))
+budget_progress_fill.pack(side="left", fill="y")
+
+# Daily Spending
+daily_frame = tk.Frame(profile_content, bg="#3d3d3d")
+daily_frame.pack(fill="x", pady=(0, 10))
+
+tk.Label(daily_frame, text=f"📊 Daily Average: ${daily_avg:.2f}", 
+         font=("Segoe UI", 10, "bold"), 
+         bg="#3d3d3d", fg="#ffffff").pack(anchor="w")
+
+tk.Label(daily_frame, text=f"Daily Limit: ${DAILY_LIMIT:.0f} • Projected Monthly: ${projected_spending:,.0f}", 
+         font=("Segoe UI", 9), 
+         bg="#3d3d3d", fg="#cccccc").pack(anchor="w")
+
+# Daily limit indicator
+daily_status = "🟢 Good" if daily_avg <= DAILY_LIMIT else "🟡 Watch" if daily_avg <= DAILY_LIMIT * 1.2 else "🔴 Over"
+tk.Label(daily_frame, text=daily_status, 
+         font=("Segoe UI", 9, "bold"), 
+         bg="#3d3d3d", fg="#00d4aa" if daily_avg <= DAILY_LIMIT else "#f9ca24" if daily_avg <= DAILY_LIMIT * 1.2 else "#ff6b6b").pack(anchor="w")
+
+# Savings Goal
+savings_frame = tk.Frame(profile_content, bg="#3d3d3d")
+savings_frame.pack(fill="x", pady=(0, 10))
+
+tk.Label(savings_frame, text=f"🎯 Savings Goal: ${SAVINGS_GOAL:,.0f}", 
+         font=("Segoe UI", 10, "bold"), 
+         bg="#3d3d3d", fg="#ffffff").pack(anchor="w")
+
+potential_savings = max(MONTHLY_BUDGET - projected_spending, 0)
+savings_percent = (potential_savings / SAVINGS_GOAL) * 100 if SAVINGS_GOAL > 0 else 0
+
+tk.Label(savings_frame, text=f"Potential Savings: ${potential_savings:,.0f} ({savings_percent:.0f}% of goal)", 
+         font=("Segoe UI", 9), 
+         bg="#3d3d3d", fg="#00d4aa" if potential_savings >= SAVINGS_GOAL else "#f9ca24").pack(anchor="w")
+
+# Month Progress
+month_frame = tk.Frame(profile_content, bg="#3d3d3d")
+month_frame.pack(fill="x", pady=(10, 0))
+
 days_in_month = calendar.monthrange(today.year, today.month)[1]
 remaining_days = days_in_month - today.day + 1
 completion_percent = round((today.day - 1) / days_in_month * 100)
 
-tk.Label(profile_content, text=f"📅 {month_name} Progress", 
-         font=("Segoe UI", 12, "bold"), 
-         bg="#3d3d3d", fg="#ffffff", anchor="w").pack(anchor="w", pady=(0, 5))
+tk.Label(month_frame, text=f"📅 {month_name} Progress", 
+         font=("Segoe UI", 10, "bold"), 
+         bg="#3d3d3d", fg="#ffffff", anchor="w").pack(anchor="w")
 
-# Progress bar
-progress_frame = tk.Frame(profile_content, bg="#2d2d2d", height=8, relief="flat")
-progress_frame.pack(fill="x", pady=(0, 10))
-progress_frame.pack_propagate(False)
-
-progress_fill = tk.Frame(progress_frame, bg="#00d4aa", width=int(progress_frame.winfo_reqwidth() * completion_percent / 100))
-progress_fill.pack(side="left", fill="y")
-
-tk.Label(profile_content, text=f"{completion_percent}% Complete • {remaining_days} days remaining", 
-         font=("Segoe UI", 10), 
-         bg="#3d3d3d", fg="#cccccc").pack(anchor="w")
-
-# Stats
-stats_frame = tk.Frame(profile_content, bg="#3d3d3d")
-stats_frame.pack(fill="x", pady=(15, 0))
-
-# Count weekdays and weekends
-weekdays = 0
-weekends = 0
-for day in range(today.day, days_in_month + 1):
-    weekday = datetime.date(today.year, today.month, day).weekday()
-    if weekday < 5:
-        weekdays += 1
-    else:
-        weekends += 1
-
-tk.Label(stats_frame, text=f"📊 {weekdays} weekdays • 🏖️ {weekends} weekends", 
-         font=("Segoe UI", 10), 
+tk.Label(month_frame, text=f"{completion_percent}% Complete • {remaining_days} days remaining", 
+         font=("Segoe UI", 9), 
          bg="#3d3d3d", fg="#cccccc").pack(anchor="w")
 
 # Chart (right)
@@ -728,8 +803,101 @@ def refresh_table():
     refresh_category_cards()
     # Update chart with current period
     update_chart()
+    # Refresh profile overview
+    refresh_profile_overview()
     # Update scroll region after content changes
     root.after(50, configure_scroll_region)
+
+# Refresh profile overview
+def refresh_profile_overview():
+    # Clear existing profile content
+    for widget in profile_content.winfo_children():
+        widget.destroy()
+    
+    # Recalculate financial data
+    current_spending = get_monthly_spending()
+    daily_avg = get_daily_average()
+    projected_spending = get_projected_monthly()
+    
+    # Budget progress
+    budget_percent = min((current_spending / MONTHLY_BUDGET) * 100, 100)
+    budget_remaining = max(MONTHLY_BUDGET - current_spending, 0)
+    
+    # Financial Overview Section
+    tk.Label(profile_content, text="💰 Financial Overview", 
+             font=("Segoe UI", 12, "bold"), 
+             bg="#3d3d3d", fg="#ffffff", anchor="w").pack(anchor="w", pady=(0, 10))
+    
+    # Monthly Budget Progress
+    budget_frame = tk.Frame(profile_content, bg="#3d3d3d")
+    budget_frame.pack(fill="x", pady=(0, 10))
+    
+    tk.Label(budget_frame, text=f"Monthly Budget: ${MONTHLY_BUDGET:,.0f}", 
+             font=("Segoe UI", 10, "bold"), 
+             bg="#3d3d3d", fg="#ffffff").pack(anchor="w")
+    
+    tk.Label(budget_frame, text=f"Spent: ${current_spending:,.2f} • Remaining: ${budget_remaining:,.2f}", 
+             font=("Segoe UI", 9), 
+             bg="#3d3d3d", fg="#cccccc").pack(anchor="w")
+    
+    # Budget progress bar
+    budget_progress_frame = tk.Frame(budget_frame, bg="#2d2d2d", height=6, relief="flat")
+    budget_progress_frame.pack(fill="x", pady=(5, 0))
+    budget_progress_frame.pack_propagate(False)
+    
+    budget_progress_fill = tk.Frame(budget_progress_frame, 
+                                   bg="#ff6b6b" if budget_percent > 80 else "#f9ca24" if budget_percent > 60 else "#00d4aa", 
+                                   width=int(budget_progress_frame.winfo_reqwidth() * budget_percent / 100))
+    budget_progress_fill.pack(side="left", fill="y")
+    
+    # Daily Spending
+    daily_frame = tk.Frame(profile_content, bg="#3d3d3d")
+    daily_frame.pack(fill="x", pady=(0, 10))
+    
+    tk.Label(daily_frame, text=f"📊 Daily Average: ${daily_avg:.2f}", 
+             font=("Segoe UI", 10, "bold"), 
+             bg="#3d3d3d", fg="#ffffff").pack(anchor="w")
+    
+    tk.Label(daily_frame, text=f"Daily Limit: ${DAILY_LIMIT:.0f} • Projected Monthly: ${projected_spending:,.0f}", 
+             font=("Segoe UI", 9), 
+             bg="#3d3d3d", fg="#cccccc").pack(anchor="w")
+    
+    # Daily limit indicator
+    daily_status = "🟢 Good" if daily_avg <= DAILY_LIMIT else "🟡 Watch" if daily_avg <= DAILY_LIMIT * 1.2 else "🔴 Over"
+    tk.Label(daily_frame, text=daily_status, 
+             font=("Segoe UI", 9, "bold"), 
+             bg="#3d3d3d", fg="#00d4aa" if daily_avg <= DAILY_LIMIT else "#f9ca24" if daily_avg <= DAILY_LIMIT * 1.2 else "#ff6b6b").pack(anchor="w")
+    
+    # Savings Goal
+    savings_frame = tk.Frame(profile_content, bg="#3d3d3d")
+    savings_frame.pack(fill="x", pady=(0, 10))
+    
+    tk.Label(savings_frame, text=f"🎯 Savings Goal: ${SAVINGS_GOAL:,.0f}", 
+             font=("Segoe UI", 10, "bold"), 
+             bg="#3d3d3d", fg="#ffffff").pack(anchor="w")
+    
+    potential_savings = max(MONTHLY_BUDGET - projected_spending, 0)
+    savings_percent = (potential_savings / SAVINGS_GOAL) * 100 if SAVINGS_GOAL > 0 else 0
+    
+    tk.Label(savings_frame, text=f"Potential Savings: ${potential_savings:,.0f} ({savings_percent:.0f}% of goal)", 
+             font=("Segoe UI", 9), 
+             bg="#3d3d3d", fg="#00d4aa" if potential_savings >= SAVINGS_GOAL else "#f9ca24").pack(anchor="w")
+    
+    # Month Progress
+    month_frame = tk.Frame(profile_content, bg="#3d3d3d")
+    month_frame.pack(fill="x", pady=(10, 0))
+    
+    days_in_month = calendar.monthrange(today.year, today.month)[1]
+    remaining_days = days_in_month - today.day + 1
+    completion_percent = round((today.day - 1) / days_in_month * 100)
+    
+    tk.Label(month_frame, text=f"📅 {month_name} Progress", 
+             font=("Segoe UI", 10, "bold"), 
+             bg="#3d3d3d", fg="#ffffff", anchor="w").pack(anchor="w")
+    
+    tk.Label(month_frame, text=f"{completion_percent}% Complete • {remaining_days} days remaining", 
+             font=("Segoe UI", 9), 
+             bg="#3d3d3d", fg="#cccccc").pack(anchor="w")
 
 # Add hover effects for buttons
 def add_hover_effects():
